@@ -1,32 +1,35 @@
 import { Injectable } from '@nestjs/common';
-import { Todo } from './todo.interface';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Todo, TodoDocument } from './todo.schema';
+import { CreateTodoDto } from './create-todo.dto';
 
 @Injectable()
 export class TodoService {
-    private todos: Todo[] = [];
+  constructor(
+    @InjectModel(Todo.name) private todoModel: Model<TodoDocument>,
+  ) { }
 
-    findAll(): Todo[] {
-        return this.todos;
-    }
+  async findAll(): Promise<Todo[]> {
+    return this.todoModel.find().lean().exec();
+  }
 
-    findOne(id: number): Todo | undefined {
-        return this.todos.find(todo => todo.id === id);
-    }
+  async findOne(id: string): Promise<Todo | null> {
+    return this.todoModel.findById(id).lean().exec();
+  }
 
-    create(todo: Omit<Todo, 'id'>): Todo {
-        const newTodo = { id: Date.now(), ...todo };
-        this.todos.push(newTodo);
-        return newTodo;
-    }
+  async create(createTodoDto: CreateTodoDto): Promise<Todo> {
+    const created = new this.todoModel(createTodoDto);
+    const saved = await created.save();
+    console.log('TODO saved to DB:', saved)
+    return created.toObject();
+  }
 
-    update(id: number, updated: Partial<Todo>): Todo | null {
-        const todo = this.findOne(id);
-        if (!todo) return null;
-        Object.assign(todo, updated);
-        return todo;
-    }
+  async update(id: string, updateData: Partial<Todo>): Promise<Todo | null> {
+    return this.todoModel.findByIdAndUpdate(id, updateData, { new: true }).lean().exec();
+  }
 
-    delete(id: number): void {
-        this.todos = this.todos.filter(todo => todo.id !== id);
-    }
+  async delete(id: string): Promise<void> {
+    await this.todoModel.findByIdAndDelete(id).exec();
+  }
 }
